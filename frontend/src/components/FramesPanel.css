@@ -1,0 +1,35 @@
+.frames-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.frames-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.frame-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background: #3c3c3c;
+  border: 1px solid #404040;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.frame-item:hover {
+  background: #4a4a4a;
+}
+
+.frame-item.active {
+  background: #007acc;
+  border-color: #007acc;
+}
+
+.frame-number {
+  font-size: 14px;
+  font-weight: 600;
+}
