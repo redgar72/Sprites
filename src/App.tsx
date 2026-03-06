@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import Canvas from './components/Canvas';
 import Toolbar from './components/Toolbar';
 import LayersPanel from './components/LayersPanel';
@@ -24,7 +24,7 @@ export type Frame = {
 function App() {
   const [currentTool, setCurrentTool] = useState<Tool>('pencil');
   const [currentColor, setCurrentColor] = useState('#ffffff');
-  const [canvasSize, setCanvasSize] = useState({ width: 32, height: 32 });
+  const [canvasSize] = useState({ width: 32, height: 32 });
   const [frames, setFrames] = useState<Frame[]>([
     {
       id: '1',
@@ -44,7 +44,6 @@ function App() {
   const [currentLayerIndex, setCurrentLayerIndex] = useState(0);
 
   const currentFrame = frames[currentFrameIndex];
-  const currentLayer = currentFrame?.layers[currentLayerIndex];
 
   const updateLayer = (layerId: string, pixels: Uint8ClampedArray) => {
     setFrames(prev => {

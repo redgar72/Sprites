@@ -1,4 +1,3 @@
-import React from 'react';
 import { Tool } from '../App';
 import './Toolbar.css';
 

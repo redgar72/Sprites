@@ -1,5 +1,5 @@
-import React, { useRef, useEffect, useState } from 'react';
-import { Frame, Layer, Tool } from '../App';
+import { useRef, useEffect, useState } from 'react';
+import { Frame, Tool } from '../App';
 import './Canvas.css';
 
 interface CanvasProps {

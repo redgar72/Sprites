@@ -1,4 +1,3 @@
-import React from 'react';
 import { Frame } from '../App';
 import './FramesPanel.css';
 
