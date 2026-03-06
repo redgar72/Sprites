@@ -4,6 +4,7 @@ import Toolbar from './components/Toolbar';
 import LayersPanel from './components/LayersPanel';
 import FramesPanel from './components/FramesPanel';
 import ColorPicker, { RGBA } from './components/ColorPicker';
+import PixelSizeControl from './components/PixelSizeControl';
 import './App.css';
 
 export type Tool = 'pencil' | 'eraser' | 'fill' | 'eyedropper';
@@ -25,6 +26,7 @@ function App() {
   const [currentTool, setCurrentTool] = useState<Tool>('pencil');
   const [currentColor, setCurrentColor] = useState<RGBA>({ r: 255, g: 255, b: 255, a: 255 });
   const [canvasSize] = useState({ width: 32, height: 32 });
+  const [pixelSize, setPixelSize] = useState(16);
   const [frames, setFrames] = useState<Frame[]>([
     {
       id: '1',
@@ -243,12 +245,13 @@ function App() {
         <div className="left-panel">
           <Toolbar currentTool={currentTool} onToolChange={setCurrentTool} />
           <ColorPicker currentColor={currentColor} onColorChange={setCurrentColor} />
+          <PixelSizeControl pixelSize={pixelSize} onPixelSizeChange={setPixelSize} />
         </div>
         <div className="center-panel">
           <Canvas
             width={canvasSize.width}
             height={canvasSize.height}
-            scale={16}
+            scale={pixelSize}
             currentTool={currentTool}
             currentColor={currentColor}
             frame={currentFrame}
