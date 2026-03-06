@@ -25,7 +25,6 @@ The app will be available at http://localhost:3000
 ### Development
 
 ```bash
-cd frontend
 npm install
 npm run dev
 ```
@@ -35,11 +34,10 @@ The app runs entirely in your browser - all data stays local to your machine.
 ### Building for Production
 
 ```bash
-cd frontend
 npm run build
 ```
 
-The built files will be in `frontend/dist/`.
+The built files will be in `dist/`.
 
 ## GitHub Pages Deployment
 
@@ -54,7 +52,7 @@ This repository is configured to automatically deploy to GitHub Pages when chang
 
 The app will be available at `https://yourusername.github.io/Sprites/`
 
-**Note:** If your repository name is different from "Sprites", update the `base` path in `frontend/vite.config.ts` to match your repository name.
+**Note:** If your repository name is different from "Sprites", update the `base` path in `vite.config.ts` to match your repository name.
 
 ## Tech Stack
 
