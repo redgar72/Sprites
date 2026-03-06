@@ -40,3 +40,42 @@
 .color-preset:hover {
   border-color: #007acc;
 }
+
+.alpha-control {
+  margin-bottom: 10px;
+}
+
+.alpha-control label {
+  display: block;
+  font-size: 11px;
+  color: #cccccc;
+  margin-bottom: 4px;
+}
+
+.alpha-slider {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: #404040;
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.alpha-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #007acc;
+  cursor: pointer;
+}
+
+.alpha-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #007acc;
+  cursor: pointer;
+  border: none;
+}

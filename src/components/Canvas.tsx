@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
 import { Frame, Tool } from '../App';
+import { RGBA } from './ColorPicker';
 import './Canvas.css';
 
 interface CanvasProps {
@@ -7,11 +8,11 @@ interface CanvasProps {
   height: number;
   scale: number;
   currentTool: Tool;
-  currentColor: string;
+  currentColor: RGBA;
   frame: Frame;
   currentLayerIndex: number;
   onLayerUpdate: (layerId: string, pixels: Uint8ClampedArray) => void;
-  onColorPick?: (color: string) => void;
+  onColorPick?: (color: RGBA) => void;
 }
 
 const Canvas: React.FC<CanvasProps> = ({
@@ -28,8 +29,22 @@ const Canvas: React.FC<CanvasProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [lastPos, setLastPos] = useState<{ x: number; y: number } | null>(null);
+  const isMouseDownRef = useRef(false);
 
   const currentLayer = frame.layers[currentLayerIndex];
+
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      isMouseDownRef.current = false;
+      setIsDrawing(false);
+      setLastPos(null);
+    };
+
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => {
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+  }, []);
 
   useEffect(() => {
     if (!canvasRef.current || !currentLayer) return;
@@ -47,17 +62,52 @@ const Canvas: React.FC<CanvasProps> = ({
     const imageData = ctx.createImageData(width, height);
     const pixels = imageData.data;
 
+    // Draw checkerboard pattern for transparency
+    const checkerSize = 8;
+    const lightGray = [200, 200, 200];
+    const white = [255, 255, 255];
+    
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4;
+        const checkX = Math.floor(x / checkerSize);
+        const checkY = Math.floor(y / checkerSize);
+        const isLight = (checkX + checkY) % 2 === 0;
+        const color = isLight ? lightGray : white;
+        
+        pixels[idx] = color[0];
+        pixels[idx + 1] = color[1];
+        pixels[idx + 2] = color[2];
+        pixels[idx + 3] = 255;
+      }
+    }
+
+    // Composite layers on top of checkerboard
     frame.layers.forEach(layer => {
       if (layer.visible) {
         for (let i = 0; i < layer.pixels.length; i += 4) {
-          const alpha = layer.pixels[i + 3] * layer.opacity;
-          if (alpha > 0) {
+          const srcR = layer.pixels[i];
+          const srcG = layer.pixels[i + 1];
+          const srcB = layer.pixels[i + 2];
+          const srcA = layer.pixels[i + 3] * layer.opacity;
+          
+          if (srcA > 0) {
             const idx = i / 4;
             const pixelIdx = idx * 4;
-            pixels[pixelIdx] = layer.pixels[i];
-            pixels[pixelIdx + 1] = layer.pixels[i + 1];
-            pixels[pixelIdx + 2] = layer.pixels[i + 2];
-            pixels[pixelIdx + 3] = alpha;
+            const dstR = pixels[pixelIdx];
+            const dstG = pixels[pixelIdx + 1];
+            const dstB = pixels[pixelIdx + 2];
+            const dstA = pixels[pixelIdx + 3];
+            const srcAlpha = srcA / 255;
+            const dstAlpha = dstA / 255;
+            const outAlpha = srcAlpha + dstAlpha * (1 - srcAlpha);
+            
+            if (outAlpha > 0) {
+              pixels[pixelIdx] = Math.round((srcR * srcAlpha + dstR * dstAlpha * (1 - srcAlpha)) / outAlpha);
+              pixels[pixelIdx + 1] = Math.round((srcG * srcAlpha + dstG * dstAlpha * (1 - srcAlpha)) / outAlpha);
+              pixels[pixelIdx + 2] = Math.round((srcB * srcAlpha + dstB * dstAlpha * (1 - srcAlpha)) / outAlpha);
+              pixels[pixelIdx + 3] = Math.round(outAlpha * 255);
+            }
           }
         }
       }
@@ -66,11 +116,8 @@ const Canvas: React.FC<CanvasProps> = ({
     ctx.putImageData(imageData, 0, 0);
   }, [frame, width, height, scale, currentLayerIndex, frame.layers.map(l => l.version).join(',')]);
 
-  const hexToRgba = (hex: string): [number, number, number, number] => {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return [r, g, b, 255];
+  const rgbaToArray = (rgba: RGBA): [number, number, number, number] => {
+    return [rgba.r, rgba.g, rgba.b, rgba.a];
   };
 
   const getPixelPos = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -167,16 +214,19 @@ const Canvas: React.FC<CanvasProps> = ({
     const pos = getPixelPos(e);
     if (!pos || !currentLayer) return;
 
-    const color = hexToRgba(currentColor);
+    isMouseDownRef.current = true;
+    const color = rgbaToArray(currentColor);
 
     if (currentTool === 'eyedropper') {
       const idx = (pos.y * width + pos.x) * 4;
-      const r = currentLayer.pixels[idx].toString(16).padStart(2, '0');
-      const g = currentLayer.pixels[idx + 1].toString(16).padStart(2, '0');
-      const b = currentLayer.pixels[idx + 2].toString(16).padStart(2, '0');
-      const hex = `#${r}${g}${b}`;
+      const pickedColor: RGBA = {
+        r: currentLayer.pixels[idx],
+        g: currentLayer.pixels[idx + 1],
+        b: currentLayer.pixels[idx + 2],
+        a: currentLayer.pixels[idx + 3]
+      };
       if (onColorPick) {
-        onColorPick(hex);
+        onColorPick(pickedColor);
       }
       return;
     }
@@ -206,7 +256,7 @@ const Canvas: React.FC<CanvasProps> = ({
     const pos = getPixelPos(e);
     if (!pos || !lastPos) return;
 
-    const color = hexToRgba(currentColor);
+    const color = rgbaToArray(currentColor);
 
     if (currentTool === 'pencil') {
       drawLine(lastPos.x, lastPos.y, pos.x, pos.y, color);
@@ -218,8 +268,25 @@ const Canvas: React.FC<CanvasProps> = ({
   };
 
   const handleMouseUp = () => {
+    isMouseDownRef.current = false;
     setIsDrawing(false);
     setLastPos(null);
+  };
+
+  const handleMouseEnter = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (isMouseDownRef.current && !isDrawing) {
+      const pos = getPixelPos(e);
+      if (pos) {
+        setIsDrawing(true);
+        setLastPos(pos);
+        const color = rgbaToArray(currentColor);
+        if (currentTool === 'pencil') {
+          setPixel(pos.x, pos.y, color);
+        } else if (currentTool === 'eraser') {
+          setPixel(pos.x, pos.y, [0, 0, 0, 0]);
+        }
+      }
+    }
   };
 
   return (
@@ -229,7 +296,7 @@ const Canvas: React.FC<CanvasProps> = ({
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+        onMouseEnter={handleMouseEnter}
       />
     </div>
   );

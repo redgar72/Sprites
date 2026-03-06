@@ -3,7 +3,7 @@ import Canvas from './components/Canvas';
 import Toolbar from './components/Toolbar';
 import LayersPanel from './components/LayersPanel';
 import FramesPanel from './components/FramesPanel';
-import ColorPicker from './components/ColorPicker';
+import ColorPicker, { RGBA } from './components/ColorPicker';
 import './App.css';
 
 export type Tool = 'pencil' | 'eraser' | 'fill' | 'eyedropper';
@@ -23,7 +23,7 @@ export type Frame = {
 
 function App() {
   const [currentTool, setCurrentTool] = useState<Tool>('pencil');
-  const [currentColor, setCurrentColor] = useState('#ffffff');
+  const [currentColor, setCurrentColor] = useState<RGBA>({ r: 255, g: 255, b: 255, a: 255 });
   const [canvasSize] = useState({ width: 32, height: 32 });
   const [frames, setFrames] = useState<Frame[]>([
     {
@@ -129,12 +129,23 @@ function App() {
     frame.layers.forEach(layer => {
       if (layer.visible) {
         for (let i = 0; i < layer.pixels.length; i += 4) {
-          const alpha = layer.pixels[i + 3] * layer.opacity;
-          if (alpha > 0) {
-            pixels[i] = layer.pixels[i];
-            pixels[i + 1] = layer.pixels[i + 1];
-            pixels[i + 2] = layer.pixels[i + 2];
-            pixels[i + 3] = alpha;
+          const srcR = layer.pixels[i];
+          const srcG = layer.pixels[i + 1];
+          const srcB = layer.pixels[i + 2];
+          const srcA = layer.pixels[i + 3] * layer.opacity;
+          
+          if (srcA > 0) {
+            const dstA = pixels[i + 3];
+            const srcAlpha = srcA / 255;
+            const dstAlpha = dstA / 255;
+            const outAlpha = srcAlpha + dstAlpha * (1 - srcAlpha);
+            
+            if (outAlpha > 0) {
+              pixels[i] = Math.round((srcR * srcAlpha + pixels[i] * dstAlpha * (1 - srcAlpha)) / outAlpha);
+              pixels[i + 1] = Math.round((srcG * srcAlpha + pixels[i + 1] * dstAlpha * (1 - srcAlpha)) / outAlpha);
+              pixels[i + 2] = Math.round((srcB * srcAlpha + pixels[i + 2] * dstAlpha * (1 - srcAlpha)) / outAlpha);
+              pixels[i + 3] = Math.round(outAlpha * 255);
+            }
           }
         }
       }
