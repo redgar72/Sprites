@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react';
-import { Frame, Tool } from '../App';
+import { Frame, Tool, MirrorMode } from '../App';
 import { RGBA } from './ColorPicker';
 import './Canvas.css';
 
@@ -13,6 +13,7 @@ interface CanvasProps {
   currentLayerIndex: number;
   onLayerUpdate: (layerId: string, pixels: Uint8ClampedArray) => void;
   onColorPick?: (color: RGBA) => void;
+  mirrorMode: MirrorMode;
 }
 
 const Canvas: React.FC<CanvasProps> = ({
@@ -24,7 +25,8 @@ const Canvas: React.FC<CanvasProps> = ({
   frame,
   currentLayerIndex,
   onLayerUpdate,
-  onColorPick
+  onColorPick,
+  mirrorMode
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -136,11 +138,27 @@ const Canvas: React.FC<CanvasProps> = ({
     if (!currentLayer) return;
 
     const pixels = new Uint8ClampedArray(currentLayer.pixels);
-    const idx = (y * width + x) * 4;
-    pixels[idx] = color[0];
-    pixels[idx + 1] = color[1];
-    pixels[idx + 2] = color[2];
-    pixels[idx + 3] = color[3];
+    const positions: Array<{ x: number; y: number }> = [{ x, y }];
+
+    if (mirrorMode === 'horizontal' || mirrorMode === 'both') {
+      positions.push({ x: width - 1 - x, y });
+    }
+    if (mirrorMode === 'vertical' || mirrorMode === 'both') {
+      positions.push({ x, y: height - 1 - y });
+    }
+    if (mirrorMode === 'both') {
+      positions.push({ x: width - 1 - x, y: height - 1 - y });
+    }
+
+    positions.forEach(pos => {
+      if (pos.x >= 0 && pos.x < width && pos.y >= 0 && pos.y < height) {
+        const idx = (pos.y * width + pos.x) * 4;
+        pixels[idx] = color[0];
+        pixels[idx + 1] = color[1];
+        pixels[idx + 2] = color[2];
+        pixels[idx + 3] = color[3];
+      }
+    });
 
     onLayerUpdate(currentLayer.id, pixels);
   };
@@ -150,7 +168,17 @@ const Canvas: React.FC<CanvasProps> = ({
 
     const pixels = new Uint8ClampedArray(currentLayer.pixels);
     const visited = new Set<string>();
-    const stack: Array<{ x: number; y: number }> = [{ x, y }];
+    const seedPositions: Array<{ x: number; y: number }> = [{ x, y }];
+
+    if (mirrorMode === 'horizontal' || mirrorMode === 'both') {
+      seedPositions.push({ x: width - 1 - x, y });
+    }
+    if (mirrorMode === 'vertical' || mirrorMode === 'both') {
+      seedPositions.push({ x, y: height - 1 - y });
+    }
+    if (mirrorMode === 'both') {
+      seedPositions.push({ x: width - 1 - x, y: height - 1 - y });
+    }
 
     const getColor = (x: number, y: number): [number, number, number, number] => {
       const idx = (y * width + x) * 4;
@@ -161,12 +189,10 @@ const Canvas: React.FC<CanvasProps> = ({
       return a[0] === b[0] && a[1] === b[1] && a[2] === b[2] && a[3] === b[3];
     };
 
-    while (stack.length > 0) {
-      const { x: px, y: py } = stack.pop()!;
+    const fillAt = (px: number, py: number) => {
       const key = `${px},${py}`;
-
-      if (px < 0 || px >= width || py < 0 || py >= height || visited.has(key)) continue;
-      if (!colorsMatch(getColor(px, py), targetColor)) continue;
+      if (px < 0 || px >= width || py < 0 || py >= height || visited.has(key)) return;
+      if (!colorsMatch(getColor(px, py), targetColor)) return;
 
       visited.add(key);
       const idx = (py * width + px) * 4;
@@ -175,10 +201,29 @@ const Canvas: React.FC<CanvasProps> = ({
       pixels[idx + 2] = fillColor[2];
       pixels[idx + 3] = fillColor[3];
 
-      stack.push({ x: px + 1, y: py });
-      stack.push({ x: px - 1, y: py });
-      stack.push({ x: px, y: py + 1 });
-      stack.push({ x: px, y: py - 1 });
+      return { x: px, y: py };
+    };
+
+    const stack: Array<{ x: number; y: number }> = [];
+    seedPositions.forEach(seed => {
+      const result = fillAt(seed.x, seed.y);
+      if (result) stack.push(result);
+    });
+
+    while (stack.length > 0) {
+      const { x: px, y: py } = stack.pop()!;
+
+      const neighbors = [
+        { x: px + 1, y: py },
+        { x: px - 1, y: py },
+        { x: px, y: py + 1 },
+        { x: px, y: py - 1 }
+      ];
+
+      neighbors.forEach(neighbor => {
+        const result = fillAt(neighbor.x, neighbor.y);
+        if (result) stack.push(result);
+      });
     }
 
     onLayerUpdate(currentLayer.id, pixels);

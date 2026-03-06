@@ -22,11 +22,14 @@ export type Frame = {
   layers: Layer[];
 };
 
+export type MirrorMode = 'none' | 'horizontal' | 'vertical' | 'both';
+
 function App() {
   const [currentTool, setCurrentTool] = useState<Tool>('pencil');
   const [currentColor, setCurrentColor] = useState<RGBA>({ r: 255, g: 255, b: 255, a: 255 });
   const [canvasSize] = useState({ width: 32, height: 32 });
   const [pixelSize, setPixelSize] = useState(16);
+  const [mirrorMode, setMirrorMode] = useState<MirrorMode>('none');
   const [frames, setFrames] = useState<Frame[]>([
     {
       id: '1',
@@ -118,6 +121,49 @@ function App() {
     });
   };
 
+  const mirrorLayer = (layerId: string, axis: 'horizontal' | 'vertical') => {
+    setFrames(prev => {
+      const newFrames = [...prev];
+      const frame = { ...newFrames[currentFrameIndex] };
+      const layerIndex = frame.layers.findIndex(l => l.id === layerId);
+      if (layerIndex === -1) return prev;
+
+      const layer = frame.layers[layerIndex];
+      const newPixels = new Uint8ClampedArray(layer.pixels.length);
+      const { width, height } = canvasSize;
+
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          let srcX = x;
+          let srcY = y;
+
+          if (axis === 'horizontal') {
+            srcX = width - 1 - x;
+          } else {
+            srcY = height - 1 - y;
+          }
+
+          const srcIdx = (srcY * width + srcX) * 4;
+          const dstIdx = (y * width + x) * 4;
+
+          newPixels[dstIdx] = layer.pixels[srcIdx];
+          newPixels[dstIdx + 1] = layer.pixels[srcIdx + 1];
+          newPixels[dstIdx + 2] = layer.pixels[srcIdx + 2];
+          newPixels[dstIdx + 3] = layer.pixels[srcIdx + 3];
+        }
+      }
+
+      frame.layers = [...frame.layers];
+      frame.layers[layerIndex] = {
+        ...layer,
+        pixels: newPixels,
+        version: (layer.version || 0) + 1
+      };
+      newFrames[currentFrameIndex] = frame;
+      return newFrames;
+    });
+  };
+
   const renderFrameToCanvas = (frame: Frame): HTMLCanvasElement => {
     const canvas = document.createElement('canvas');
     canvas.width = canvasSize.width;
@@ -157,16 +203,42 @@ function App() {
     return canvas;
   };
 
+  const saveFile = async (blob: Blob, defaultName: string, mimeType: string) => {
+    if ('showSaveFilePicker' in window) {
+      try {
+        const fileHandle = await (window as any).showSaveFilePicker({
+          suggestedName: defaultName,
+          types: [{
+            description: mimeType === 'image/png' ? 'PNG Image' : mimeType === 'image/gif' ? 'GIF Image' : 'Image',
+            accept: { [mimeType]: [`.${defaultName.split('.').pop()}`] }
+          }]
+        });
+        const writable = await fileHandle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return;
+      } catch (err: any) {
+        if (err.name !== 'AbortError') {
+          console.error('Error saving file:', err);
+        }
+        return;
+      }
+    }
+    
+    const filename = prompt('Enter filename:', defaultName) || defaultName;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const exportImage = () => {
     const canvas = renderFrameToCanvas(currentFrame);
     canvas.toBlob(blob => {
       if (blob) {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'sprite.png';
-        a.click();
-        URL.revokeObjectURL(url);
+        saveFile(blob, 'sprite.png', 'image/png');
       }
     });
   };
@@ -186,12 +258,7 @@ function App() {
     });
 
     gif.on('finished', (blob: Blob) => {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'sprite.gif';
-      a.click();
-      URL.revokeObjectURL(url);
+      saveFile(blob, 'sprite.gif', 'image/gif');
     });
 
     gif.render();
@@ -221,12 +288,7 @@ function App() {
 
     canvas.toBlob(blob => {
       if (blob) {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'spritesheet.png';
-        a.click();
-        URL.revokeObjectURL(url);
+        saveFile(blob, 'spritesheet.png', 'image/png');
       }
     });
   };
@@ -243,7 +305,12 @@ function App() {
       </div>
       <div className="app-content">
         <div className="left-panel">
-          <Toolbar currentTool={currentTool} onToolChange={setCurrentTool} />
+          <Toolbar 
+            currentTool={currentTool} 
+            onToolChange={setCurrentTool}
+            mirrorMode={mirrorMode}
+            onMirrorModeChange={setMirrorMode}
+          />
           <ColorPicker currentColor={currentColor} onColorChange={setCurrentColor} />
           <PixelSizeControl pixelSize={pixelSize} onPixelSizeChange={setPixelSize} />
         </div>
@@ -258,6 +325,7 @@ function App() {
             currentLayerIndex={currentLayerIndex}
             onLayerUpdate={updateLayer}
             onColorPick={setCurrentColor}
+            mirrorMode={mirrorMode}
           />
         </div>
         <div className="right-panel">
@@ -267,6 +335,7 @@ function App() {
             onLayerSelect={setCurrentLayerIndex}
             onLayerVisibilityToggle={toggleLayerVisibility}
             onAddLayer={addLayer}
+            onMirrorLayer={mirrorLayer}
           />
           <FramesPanel
             frames={frames}

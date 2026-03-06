@@ -7,6 +7,7 @@ interface LayersPanelProps {
   onLayerSelect: (index: number) => void;
   onLayerVisibilityToggle: (layerId: string) => void;
   onAddLayer: () => void;
+  onMirrorLayer: (layerId: string, axis: 'horizontal' | 'vertical') => void;
 }
 
 const LayersPanel: React.FC<LayersPanelProps> = ({
@@ -14,7 +15,8 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
   currentLayerIndex,
   onLayerSelect,
   onLayerVisibilityToggle,
-  onAddLayer
+  onAddLayer,
+  onMirrorLayer
 }) => {
   return (
     <div className="layers-panel">
@@ -39,6 +41,22 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
               {layer.visible ? '👁️' : '🚫'}
             </button>
             <span className="layer-name">{layer.name}</span>
+            <div className="layer-actions" onClick={(e) => e.stopPropagation()}>
+              <button
+                className="mirror-btn"
+                onClick={() => onMirrorLayer(layer.id, 'horizontal')}
+                title="Mirror Horizontal"
+              >
+                ↔️
+              </button>
+              <button
+                className="mirror-btn"
+                onClick={() => onMirrorLayer(layer.id, 'vertical')}
+                title="Mirror Vertical"
+              >
+                ↕️
+              </button>
+            </div>
           </div>
         ))}
       </div>
